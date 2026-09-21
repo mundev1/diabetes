@@ -1,31 +1,40 @@
-import numpy as np
 import pandas as pd
-from sklearn.preprocessing import StandardScaler
-from sklearn.model_selection import train_test_split
-from sklearn import svm
+from pathlib import Path
+from sklearn.compose import ColumnTransformer
 from sklearn.metrics import accuracy_score
+from sklearn.model_selection import train_test_split
+from sklearn.pipeline import Pipeline
+from sklearn.preprocessing import OneHotEncoder, StandardScaler
+from sklearn import svm
 
-diabetes_dataset = pd.read_csv("diabetes.csv")
+dataset_path = Path(__file__).with_name("diabetes_prediction_dataset.csv")
+diabetes_dataset = pd.read_csv(dataset_path)
 
 print(diabetes_dataset.head())
 print(diabetes_dataset.shape)
 print(diabetes_dataset.describe())
-print(diabetes_dataset['Outcome'].value_counts())
-print(diabetes_dataset.groupby('Outcome').mean())
+print(diabetes_dataset['diabetes'].value_counts())
+print(diabetes_dataset.groupby('diabetes').mean(numeric_only=True))
 
-X = diabetes_dataset.drop(columns='Outcome', axis=1)
-Y = diabetes_dataset['Outcome']
+X = diabetes_dataset.drop(columns='diabetes')
+Y = diabetes_dataset['diabetes']
 
 print(X)
 print(Y)
 
-scaler = StandardScaler()
-scaler.fit(X)
-standardized_data = scaler.transform(X)
-print(standardized_data)
+numeric_features = X.select_dtypes(include='number').columns
+categorical_features = X.select_dtypes(exclude='number').columns
+preprocessor = ColumnTransformer(
+    transformers=[
+        ('numeric', StandardScaler(), numeric_features),
+        ('categorical', OneHotEncoder(handle_unknown='ignore'), categorical_features),
+    ]
+)
 
-X = standardized_data
-Y = diabetes_dataset['Outcome']
+classifier = Pipeline([
+    ('preprocessor', preprocessor),
+    ('classifier', svm.SVC(kernel='linear')),
+])
 
 print(X)
 print(Y)
@@ -33,7 +42,6 @@ print(Y)
 X_train, X_test, Y_train, Y_test = train_test_split(X, Y, test_size=0.2, stratify=Y, random_state=2)
 print(X.shape, X_train.shape, X_test.shape)
 
-classifier = svm.SVC(kernel='linear')
 classifier.fit(X_train, Y_train)
 
 X_train_prediction = classifier.predict(X_train)
@@ -44,14 +52,18 @@ X_test_prediction = classifier.predict(X_test)
 test_data_accuracy = accuracy_score(Y_test, X_test_prediction)
 print('Accuracy score of the test data : ', test_data_accuracy)
 
-input_data = (5, 166, 72, 19, 175, 25.8, 0.587, 51)
-input_data_as_numpy_array = np.asarray(input_data)
-input_data_reshaped = input_data_as_numpy_array.reshape(1, -1)
+input_data = pd.DataFrame([{
+    'gender': 'Male',
+    'age': 51,
+    'hypertension': 0,
+    'heart_disease': 0,
+    'smoking_history': 'never',
+    'bmi': 25.8,
+    'HbA1c_level': 6.0,
+    'blood_glucose_level': 166,
+}])
 
-std_data = scaler.transform(input_data_reshaped)
-print(std_data)
-
-prediction = classifier.predict(std_data)
+prediction = classifier.predict(input_data)
 print(prediction)
 
 if prediction[0] == 0:
